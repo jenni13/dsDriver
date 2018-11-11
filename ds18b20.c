@@ -17,8 +17,11 @@ static struct file_operations fops =
 dev_t dev;
 struct cdev *my_cdev;
 static struct class* ds18b20_class;
-
+uint8_t scratchpad[9] = {0,0,0,0,0,0,0,0,0};
 uint32_t val;
+uint8_t config;
+int resolution;
+
 static int ds18b20_init(void)
 {
 	printk(KERN_INFO "ds18b20 init\n");
@@ -54,11 +57,11 @@ static int ds18b20_init(void)
 uint32_t ds_get_temperature(void)
 {
 	uint16_t timeout = 0xFFFF;
-	uint8_t scratchpad[2] = {0,0};
+	//uint8_t scratchpad[2] = {0,0};
 	int8_t digit = 0;
 	uint16_t decimal = 0;
 
-	if(time_out())
+	if(reset())
 	{
 		printk(KERN_INFO " 1er ds18b20 is not responding\n");
 		return -ENODEV;
@@ -75,7 +78,7 @@ uint32_t ds_get_temperature(void)
 		return -ENODEV;
 	}
 
-	if(time_out())
+	if(reset())
 	{
 		printk(KERN_INFO " 2eme ds18b20 is not responding\n");
 		return -ENODEV;
@@ -92,13 +95,35 @@ uint32_t ds_get_temperature(void)
 	decimal = scratchpad[0] & 0xf;
 	decimal *= DECIMAL_STEPS_12BIT;
 
-
-
-	return digit * 10000 + decimal;
+	resolution = 0;
+	return digit * 10000 + decimal ;
 
 }
 
-uint32_t time_out(void)
+void set_resolution()
+{
+	printk(KERN_INFO "set res = %d\n",res);
+	switch(res)
+	{
+		case 9:
+			config = 0x1f;
+			break;
+		case 10:
+			config = 0x3f;
+			break;
+		case 11:
+                        config = 0x5f;
+                        break;
+		case 12:
+                        config = 0x7f;
+                        break;
+	}
+	printk(KERN_INFO "set config = %u\n",config);
+
+
+}
+
+uint32_t reset(void)
 {
 	uint32_t i;
 	put_low();
@@ -184,13 +209,16 @@ static ssize_t ds_read(struct file *f,char *buf,size_t size,loff_t *offset)
 
 	int major,minor;
 	char value[16];
+
 	major = MAJOR(file_inode(f)->i_rdev);
 	minor = MINOR(file_inode(f)->i_rdev);
 
 	printk(KERN_INFO "ds_read\n");
 	switch(minor){
 		case 0:
+			set_resolution();
 			val = ds_get_temperature();
+			printk(KERN_INFO "config = %u\n",config);
 			sprintf(value,"\n%u,%u",val/10000,val%10000);
 			break;
 		case 1:
@@ -205,8 +233,36 @@ static ssize_t ds_read(struct file *f,char *buf,size_t size,loff_t *offset)
 	return 0;
 }
 
+void write_scratchpad(uint8_t s1,uint8_t s2,uint8_t conf)
+{
+ 	reset();
+        make_delay(100);
+        write_byte(CMD_SKIP_ROM);
+        write_byte(CMD_RSCRATCHPAD);
+        write_byte(s1);
+        write_byte(s2);
+        write_byte(conf);
+
+}
+
+void copy_scratchpad(void)
+{
+	reset();
+	make_delay(1000);
+	write_byte(CMD_SKIP_ROM);
+	write_byte(CMD_CPYSCRATCHPAD);
+	make_delay(1000);
+}
+
+
 static ssize_t ds_write(struct file *f,const char *buf,size_t size, loff_t *offset)
 {
+	printk(KERN_INFO "ds_write\n");
+	/*set_resolution();
+	write_scratchpad(scratchpad[2],scratchpad[3],config);
+	make_delay(1000);
+	copy_scratchpad();
+	*/
 	return 0;
 }
 

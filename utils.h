@@ -20,8 +20,14 @@
 #include <linux/delay.h>
 
 static unsigned int gpio_num=17;
+static int res = 0;
+module_param(res,int,0);
+MODULE_PARM_DESC(res,"resolution : 9,10,11 ou 12");
+
 #define MINORS 16
 #define NAME "ds18b20"
+
+
 
 #define CMD_CONV_TEMP 0x44
 #define CMD_RSCRATCHPAD 0xbe
@@ -42,15 +48,19 @@ static int ds_release(struct inode *in,struct file *f);
 uint8_t read_bit(void);
 uint8_t read_byte(void);
 
-uint32_t time_out(void); //reset
-uint32_t read_state(void); //read line state
+uint32_t reset(void);
+uint32_t read_state(void);
 uint32_t ds_get_temperature(void);
 
 void write_byte(uint8_t b);
 void write_bit(uint8_t bit);
-void put_low(void); //pullLineLow
-void flush_line(void); //releaseLine
+void put_low(void);
+void flush_line(void);
 void make_delay(uint16_t us);
+
+void set_resolution(void);
+void write_scratchpad(uint8_t s1,uint8_t s2,uint8_t conf);
+void copy_scratchpad(void);
 
 
 #endif
