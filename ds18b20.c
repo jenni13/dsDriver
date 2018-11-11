@@ -126,6 +126,7 @@ void set_resolution()
 uint32_t reset(void)
 {
 	uint32_t i;
+
 	put_low();
 	make_delay(480);
 	flush_line();
@@ -154,8 +155,10 @@ uint8_t read_bit(void)
 	make_delay(1);
 	flush_line();
 	make_delay(14);
+
 	if(read_state())
 		b = 1;
+
 	make_delay(45);
 
 	return b;
@@ -235,6 +238,7 @@ static ssize_t ds_read(struct file *f,char *buf,size_t size,loff_t *offset)
 
 void write_scratchpad(uint8_t s1,uint8_t s2,uint8_t conf)
 {
+	printk(KERN_ALERT "boucle write\n");
  	reset();
         make_delay(100);
         write_byte(CMD_SKIP_ROM);
@@ -257,12 +261,12 @@ void copy_scratchpad(void)
 
 static ssize_t ds_write(struct file *f,const char *buf,size_t size, loff_t *offset)
 {
-	printk(KERN_INFO "ds_write\n");
-	/*set_resolution();
-	write_scratchpad(scratchpad[2],scratchpad[3],config);
-	make_delay(1000);
-	copy_scratchpad();
-	*/
+
+        printk(KERN_INFO "ds_write\n");
+	//set_resolution();
+	//write_scratchpad(scratchpad[2],scratchpad[3],config);
+	//make_delay(1000);
+	//copy_scratchpad();
 	return 0;
 }
 
