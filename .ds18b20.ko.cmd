@@ -1,0 +1,1 @@
+cmd_/home/pi/Documents/alcb/ds18b20/ds18b20.ko := ld -EL -r  -T ./scripts/module-common.lds --build-id  -o /home/pi/Documents/alcb/ds18b20/ds18b20.ko /home/pi/Documents/alcb/ds18b20/ds18b20.o /home/pi/Documents/alcb/ds18b20/ds18b20.mod.o ;  true
