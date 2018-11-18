@@ -21,6 +21,12 @@ uint8_t scratchpad[9] = {0,0,0,0,0,0,0,0,0};
 uint32_t val;
 uint8_t config;
 int resolution;
+int LastDiscrepancy,LastFamilyDiscrepancy,LastDeviceFlag;
+unsigned char ROM_NO[8],crc8;
+
+
+long session_handle;
+
 
 static int ds18b20_init(void)
 {
@@ -258,6 +264,130 @@ void copy_scratchpad(void)
 	make_delay(1000);
 }
 
+unsigned char docrc8(unsigned char value)
+{
+	crc8 = dscrc_table[crc8 ^ value];
+	return crc8;
+}
+
+
+
+int OWNext(void)
+{
+	return OWSearch();
+}
+void OWTargetSetup(unsigned char family_code)
+{
+	int i;
+	// set the search state to find SearchFamily type devices
+	ROM_NO[0] = family_code;
+	for (i = 1; i < 8; i++)
+		ROM_NO[i] = 0;
+	LastDiscrepancy = 64;
+	LastFamilyDiscrepancy = 0;
+	LastDeviceFlag = FALSE;
+}
+void get_captor(void)
+{
+	int cnt,i;
+	printk(KERN_INFO "get capor\n");
+	cnt =0;
+	OWTargetSetup(0x28);
+	while(OWNext())
+	{
+		if(ROM_NO[0] != 0x28)
+			break;
+		for(i=7;i>0;i--)
+		{
+			printk(KERN_INFO "%d02X\n",ROM_NO[i]);
+		}
+		printk(KERN_INFO "%d\n",++cnt);
+	}
+}
+
+
+int OWSearch()
+{
+	int id_bit_number;
+	int last_zero,rom_byte_number, search_result;
+	int id_bit,cmp_id_bit;
+	unsigned char rom_byte_mask, search_direction;
+
+	id_bit_number =1;
+	last_zero = 0;
+	rom_byte_number = 0;
+	rom_byte_mask = 1;
+	search_result = 0;
+	crc8 = 0;
+
+	if(!LastDeviceFlag)
+	{
+		if(!reset())
+		{
+			LastDiscrepancy = 0;
+			LastDeviceFlag = FALSE;
+			LastFamilyDiscrepancy = 0;
+			return FALSE;
+		}
+		write_byte(0xF0);
+		do
+		{
+			id_bit = read_bit();
+			cmp_id_bit = read_bit();
+			if((id_bit == 1) && (cmp_id_bit == 1))
+				break;
+			else
+			{
+				if(id_bit != cmp_id_bit)
+					search_direction = id_bit;
+				else
+				{
+					if(id_bit_number < LastDiscrepancy)
+						search_direction = ((ROM_NO[rom_byte_number] && rom_byte_mask) > 0);
+					else
+						search_direction = (id_bit_number == LastDiscrepancy);
+					if(search_direction == 0)
+					{
+						last_zero = id_bit_number;
+						if(last_zero < 9)
+							LastFamilyDiscrepancy = last_zero;
+					}
+				}
+				if(search_direction == 1)
+					ROM_NO[rom_byte_number] |= rom_byte_mask;
+				else
+					ROM_NO[rom_byte_number] &= ~rom_byte_mask;
+				write_bit(search_direction);
+				id_bit_number++;
+				rom_byte_mask <<= 1;
+				if(rom_byte_mask == 0)
+				{
+					docrc8(ROM_NO[rom_byte_number]);
+					rom_byte_number++;
+					rom_byte_mask = 1;
+				}
+			}
+		}
+		while(rom_byte_number < 8);
+
+		if(!((id_bit_number < 65) || (crc8 != 0)))
+		{
+			LastDiscrepancy = last_zero;
+			if(LastDiscrepancy == 0)
+				LastDeviceFlag = TRUE;
+			search_result = TRUE;
+		}
+
+	}
+	if(!search_result || !scratchpad[0])
+	{
+		LastDiscrepancy = 0;
+		LastDeviceFlag = FALSE;
+		LastFamilyDiscrepancy = 0;
+		search_result = FALSE;
+	}
+	return search_result;
+}
 
 static ssize_t ds_write(struct file *f,const char *buf,size_t size, loff_t *offset)
 {
